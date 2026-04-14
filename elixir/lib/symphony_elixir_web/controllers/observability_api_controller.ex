@@ -8,6 +8,11 @@ defmodule SymphonyElixirWeb.ObservabilityApiController do
   alias Plug.Conn
   alias SymphonyElixirWeb.{Endpoint, Presenter}
 
+  @spec health(Conn.t(), map()) :: Conn.t()
+  def health(conn, _params) do
+    json(conn, Presenter.health_payload(orchestrator(), snapshot_timeout_ms()))
+  end
+
   @spec state(Conn.t(), map()) :: Conn.t()
   def state(conn, _params) do
     json(conn, Presenter.state_payload(orchestrator(), snapshot_timeout_ms()))

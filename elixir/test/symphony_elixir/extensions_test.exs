@@ -337,6 +337,14 @@ defmodule SymphonyElixir.ExtensionsTest do
 
     start_test_endpoint(orchestrator: orchestrator_name, snapshot_timeout_ms: 50)
 
+    health_payload = json_response(get(build_conn(), "/api/health"), 200)
+
+    assert health_payload["status"] == "ok"
+    assert health_payload["version"] == "0.1.0"
+    assert is_integer(health_payload["uptime_seconds"])
+    assert health_payload["uptime_seconds"] >= 0
+    assert health_payload["agents"] == %{"active" => 1, "max" => 10}
+
     conn = get(build_conn(), "/api/v1/state")
     state_payload = json_response(conn, 200)
 
@@ -431,6 +439,9 @@ defmodule SymphonyElixir.ExtensionsTest do
     unavailable_orchestrator = Module.concat(__MODULE__, :UnavailableOrchestrator)
     start_test_endpoint(orchestrator: unavailable_orchestrator, snapshot_timeout_ms: 5)
 
+    assert json_response(post(build_conn(), "/api/health", %{}), 405) ==
+             %{"error" => %{"code" => "method_not_allowed", "message" => "Method not allowed"}}
+
     assert json_response(post(build_conn(), "/api/v1/state", %{}), 405) ==
              %{"error" => %{"code" => "method_not_allowed", "message" => "Method not allowed"}}
 
@@ -445,6 +456,14 @@ defmodule SymphonyElixir.ExtensionsTest do
 
     assert json_response(get(build_conn(), "/unknown"), 404) ==
              %{"error" => %{"code" => "not_found", "message" => "Route not found"}}
+
+    health_payload = json_response(get(build_conn(), "/api/health"), 200)
+
+    assert health_payload["status"] == "ok"
+    assert health_payload["version"] == "0.1.0"
+    assert is_integer(health_payload["uptime_seconds"])
+    assert health_payload["uptime_seconds"] >= 0
+    assert health_payload["agents"] == %{"active" => 0, "max" => 10}
 
     state_payload = json_response(get(build_conn(), "/api/v1/state"), 200)
 
@@ -639,9 +658,20 @@ defmodule SymphonyElixir.ExtensionsTest do
     port = wait_for_bound_port()
     assert port == HttpServer.bound_port()
 
+    health_response = Req.get!("http://127.0.0.1:#{port}/api/health")
+    assert health_response.status == 200
+    assert health_response.body["status"] == "ok"
+    assert health_response.body["version"] == "0.1.0"
+    assert is_integer(health_response.body["uptime_seconds"])
+    assert health_response.body["agents"] == %{"active" => 1, "max" => 10}
+
     response = Req.get!("http://127.0.0.1:#{port}/api/v1/state")
     assert response.status == 200
     assert response.body["counts"] == %{"running" => 1, "retrying" => 1}
+
+    dashboard_response = Req.get!("http://127.0.0.1:#{port}/")
+    assert dashboard_response.status == 200
+    assert dashboard_response.body =~ "Operations Dashboard"
 
     dashboard_css = Req.get!("http://127.0.0.1:#{port}/dashboard.css")
     assert dashboard_css.status == 200

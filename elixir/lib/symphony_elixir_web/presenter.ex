@@ -5,6 +5,19 @@ defmodule SymphonyElixirWeb.Presenter do
 
   alias SymphonyElixir.{Config, Orchestrator, StatusDashboard}
 
+  @spec health_payload(GenServer.name(), timeout()) :: map()
+  def health_payload(orchestrator, snapshot_timeout_ms) do
+    %{
+      status: "ok",
+      version: app_version(),
+      uptime_seconds: runtime_uptime_seconds(),
+      agents: %{
+        active: active_agent_count(orchestrator, health_snapshot_timeout_ms(snapshot_timeout_ms)),
+        max: Config.settings!().agent.max_concurrent_agents
+      }
+    }
+  end
+
   @spec state_payload(GenServer.name(), timeout()) :: map()
   def state_payload(orchestrator, snapshot_timeout_ms) do
     generated_at = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
@@ -180,6 +193,32 @@ defmodule SymphonyElixirWeb.Presenter do
 
   defp summarize_message(nil), do: nil
   defp summarize_message(message), do: StatusDashboard.humanize_codex_message(message)
+
+  defp active_agent_count(orchestrator, timeout_ms) do
+    case Orchestrator.snapshot(orchestrator, timeout_ms) do
+      %{running: running} when is_list(running) -> length(running)
+      _ -> 0
+    end
+  end
+
+  defp health_snapshot_timeout_ms(timeout_ms) when is_integer(timeout_ms) and timeout_ms >= 0,
+    do: min(timeout_ms, 100)
+
+  defp health_snapshot_timeout_ms(_timeout_ms), do: 100
+
+  defp app_version do
+    case Application.spec(:symphony_elixir, :vsn) do
+      nil -> "unknown"
+      version -> to_string(version)
+    end
+  end
+
+  defp runtime_uptime_seconds do
+    case :erlang.statistics(:wall_clock) do
+      {milliseconds, _since_last_call} when is_integer(milliseconds) ->
+        div(max(milliseconds, 0), 1_000)
+    end
+  end
 
   defp due_at_iso8601(due_in_ms) when is_integer(due_in_ms) do
     DateTime.utc_now()
