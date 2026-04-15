@@ -173,6 +173,20 @@ The observability UI now runs on a minimal Phoenix stack:
 make all
 ```
 
+## Local demo
+
+Run the deterministic, fully local orchestration demo from the repository root:
+
+```bash
+make demo
+```
+
+The demo uses the in-memory tracker plus a scripted fake `codex app-server`, creates a demo
+workspace under `elixir/tmp/local_demo/workspaces/DEMO-1`, writes `DEMO_PROOF.md`, records a
+comment and terminal state update through the tracker interface, then preserves the proof at
+`elixir/tmp/local_demo/artifacts/DEMO_PROOF.md`. It also writes a manifest with the captured
+observability snapshots to `elixir/tmp/local_demo/result.json`.
+
 Run the real external end-to-end test only when you want Symphony to create disposable Linear
 resources and launch a real `codex app-server` session:
 

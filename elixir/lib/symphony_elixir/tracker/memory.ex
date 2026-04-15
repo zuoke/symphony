@@ -37,12 +37,17 @@ defmodule SymphonyElixir.Tracker.Memory do
 
   @spec create_comment(String.t(), String.t()) :: :ok | {:error, term()}
   def create_comment(issue_id, body) do
+    append_comment(issue_id, body)
     send_event({:memory_tracker_comment, issue_id, body})
     :ok
   end
 
   @spec update_issue_state(String.t(), String.t()) :: :ok | {:error, term()}
   def update_issue_state(issue_id, state_name) do
+    update_issue_entry(issue_id, fn %Issue{} = issue ->
+      %{issue | state: state_name, updated_at: DateTime.utc_now()}
+    end)
+
     send_event({:memory_tracker_state_update, issue_id, state_name})
     :ok
   end
@@ -53,6 +58,23 @@ defmodule SymphonyElixir.Tracker.Memory do
 
   defp issue_entries do
     Enum.filter(configured_issues(), &match?(%Issue{}, &1))
+  end
+
+  defp append_comment(issue_id, body) do
+    comments = Application.get_env(:symphony_elixir, :memory_tracker_comments, %{})
+    entries = Map.get(comments, issue_id, [])
+    Application.put_env(:symphony_elixir, :memory_tracker_comments, Map.put(comments, issue_id, entries ++ [body]))
+  end
+
+  defp update_issue_entry(issue_id, updater) when is_binary(issue_id) and is_function(updater, 1) do
+    updated_issues =
+      configured_issues()
+      |> Enum.map(fn
+        %Issue{id: ^issue_id} = issue -> updater.(issue)
+        other -> other
+      end)
+
+    Application.put_env(:symphony_elixir, :memory_tracker_issues, updated_issues)
   end
 
   defp send_event(message) do
